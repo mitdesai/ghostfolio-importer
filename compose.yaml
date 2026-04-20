@@ -1,0 +1,23 @@
+name: ghostfolio-importer
+
+services:
+  importer:
+    image: python:3.12-slim
+    container_name: ghostfolio-importer
+    restart: unless-stopped
+    env_file: .env
+    working_dir: /srv
+    ports:
+      - "${HTTP_EXTERNAL_PORT:-8421}:8080"
+    volumes:
+      - importer-state:/state
+      - pip-cache:/root/.cache/pip
+      - ${APP_PATH}:/srv
+      - ${FIDELITY_DROP_PATH}:/fidelity-drop
+      - ${ROBINHOOD_DROP_PATH}:/robinhood-drop
+    command: >
+      sh -c "pip install -q -r requirements.txt && python -m app.main"
+
+volumes:
+  importer-state:
+  pip-cache:

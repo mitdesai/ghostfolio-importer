@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.env.example
+data/
+fidelity-drop/
+tests/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.venv/
+README.md

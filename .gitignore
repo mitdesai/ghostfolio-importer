@@ -1,0 +1,23 @@
+# Secrets — never commit
+.env
+
+# Drop folders and data
+fidelity-drop/
+robinhood-drop/
+data/
+*.sqlite
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
