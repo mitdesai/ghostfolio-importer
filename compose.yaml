@@ -16,7 +16,13 @@ services:
       - ${FIDELITY_DROP_PATH}:/fidelity-drop
       - ${ROBINHOOD_DROP_PATH}:/robinhood-drop
     command: >
-      sh -c "pip install -q -r requirements.txt && python -m app.main"
+      sh -c "apt-get update
+      && apt-get install -y --no-install-recommends
+      libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+      libffi-dev shared-mime-info fonts-dejavu-core
+      && rm -rf /var/lib/apt/lists/*
+      && pip install -q -r requirements.txt
+      && python -m app.main"
 
 volumes:
   importer-state:

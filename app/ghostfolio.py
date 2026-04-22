@@ -1,4 +1,4 @@
-"""Thin wrapper around Ghostfolio's HTTP API for creating orders."""
+"""Thin wrapper around Ghostfolio's HTTP API for creating orders and reading portfolio data."""
 from __future__ import annotations
 
 import logging
@@ -97,6 +97,24 @@ class GhostfolioClient:
         r = self._request("GET", "/api/v1/account")
         r.raise_for_status()
         return r.json().get("accounts", [])
+
+    def get_accounts(self) -> list[dict[str, Any]]:
+        """Return all accounts with their id, name, currency, etc."""
+        r = self._request("GET", "/api/v1/account")
+        r.raise_for_status()
+        data = r.json()
+        return data.get("accounts", data) if isinstance(data, dict) else data
+
+    def get_portfolio_details(
+        self, account_id: str | None = None
+    ) -> dict[str, Any]:
+        """GET /api/v1/portfolio/details with optional account filter."""
+        params: dict[str, str] = {"range": "max"}
+        if account_id:
+            params["accounts"] = account_id
+        r = self._request("GET", "/api/v1/portfolio/details", params=params)
+        r.raise_for_status()
+        return r.json()
 
     def _serialize_date(self, d) -> str:
         return serialize_date_as_local_noon(d, self._tz)

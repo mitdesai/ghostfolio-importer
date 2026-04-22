@@ -11,7 +11,14 @@ RUN groupadd --system --gid 1000 app \
  && useradd  --system --uid 1000 --gid app --home /srv --shell /sbin/nologin app
 
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+
+# WeasyPrint needs pango, cairo, and fonts for PDF rendering
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
+      libffi-dev shared-mime-info fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install -r requirements.txt
 
 COPY app ./app
 

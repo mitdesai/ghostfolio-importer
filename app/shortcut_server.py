@@ -1,6 +1,6 @@
-"""HTTP server for the iOS Shortcut to POST trades to.
+"""HTTP server for the iOS Shortcut to POST trades and portfolio snapshot.
 
-Endpoint:
+Endpoints:
   POST /trade
   Headers: X-Auth-Token: <HTTP_TOKEN>
   Body (JSON):
@@ -14,6 +14,14 @@ Endpoint:
       "fee": 0                 // optional
     }
   Response: 200 {"imported": bool, "fingerprint": str}
+
+  GET /snapshot
+  Headers: X-Auth-Token: <HTTP_TOKEN>
+  Response: HTML portfolio snapshot
+
+  GET /snapshot/pdf
+  Headers: X-Auth-Token: <HTTP_TOKEN>
+  Response: PDF download of portfolio snapshot
 """
 from __future__ import annotations
 
@@ -26,6 +34,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .activity import Activity
 from .dedup import DedupStore
+from .snapshot import fetch_snapshot
+from .snapshot_template import render_html
 
 log = logging.getLogger(__name__)
 
@@ -64,11 +74,67 @@ class ShortcutServer:
                 self.end_headers()
                 self.wfile.write(body)
 
+            def _check_auth(self) -> bool:
+                if self.headers.get("X-Auth-Token") != server_ref.auth_token:
+                    self._send_json(401, {"error": "unauthorized"})
+                    return False
+                return True
+
+            def _send_html(self, status, html):
+                body = html.encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _send_pdf(self, pdf_bytes, filename):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Length", str(len(pdf_bytes)))
+                self.send_header(
+                    "Content-Disposition",
+                    f'attachment; filename="{filename}"',
+                )
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+
+            def _handle_snapshot_html(self):
+                snap = fetch_snapshot(
+                    server_ref.client,
+                    currency=server_ref.currency,
+                )
+                self._send_html(200, render_html(snap))
+
+            def _handle_snapshot_pdf(self):
+                snap = fetch_snapshot(
+                    server_ref.client,
+                    currency=server_ref.currency,
+                )
+                from weasyprint import HTML as WeasyHTML
+                pdf_bytes = WeasyHTML(string=render_html(snap)).write_pdf()
+                filename = f"portfolio-snapshot-{snap.report_date.isoformat()}.pdf"
+                self._send_pdf(pdf_bytes, filename)
+
             def do_GET(self):
+                routes = {
+                    "/snapshot": self._handle_snapshot_html,
+                    "/snapshot/pdf": self._handle_snapshot_pdf,
+                }
                 if self.path == "/health":
                     self._send_json(200, {"ok": True})
-                else:
+                    return
+                handler = routes.get(self.path)
+                if not handler:
                     self._send_json(404, {"error": "not found"})
+                    return
+                if not self._check_auth():
+                    return
+                try:
+                    handler()
+                except Exception as e:
+                    log.error("%s failed: %s", self.path, e, exc_info=True)
+                    self._send_json(500, {"error": str(e)})
 
             def do_POST(self):
                 if self.path != "/trade":
