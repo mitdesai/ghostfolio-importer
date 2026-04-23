@@ -906,31 +906,34 @@ body {{
 function downloadPdf(url) {{
   var overlay = document.getElementById("loading-overlay");
   overlay.style.display = "flex";
-  fetch(url)
-    .then(function(r) {{
-      if (!r.ok) throw new Error("Server returned " + r.status);
-      var cd = r.headers.get("Content-Disposition") || "";
-      var m = cd.match(/filename="?([^"]+)"?/);
-      return r.blob().then(function(b) {{ return {{blob: b, name: m ? m[1] : "portfolio-snapshot.pdf"}}; }});
-    }})
-    .then(function(o) {{
-      var a = document.createElement("a");
-      var blobUrl = URL.createObjectURL(o.blob);
-      a.href = blobUrl;
-      a.download = o.name;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
+
+  /* Clear any stale cookie from a previous download */
+  document.cookie = "pdf_ready=; Path=/; Max-Age=0";
+
+  /* Use a hidden iframe so the browser handles the download natively.
+     This avoids the Chrome blob-URL .crdownload bug. */
+  var iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = url;
+  document.body.appendChild(iframe);
+
+  /* Poll for the server-set cookie that signals the PDF was sent. */
+  var attempts = 0;
+  var maxAttempts = 120;  /* ~60 seconds at 500ms intervals */
+  var timer = setInterval(function() {{
+    attempts++;
+    if (document.cookie.indexOf("pdf_ready=1") !== -1) {{
+      clearInterval(timer);
       overlay.style.display = "none";
-      setTimeout(function() {{
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }}, 3000);
-    }})
-    .catch(function(e) {{
+      document.cookie = "pdf_ready=; Path=/; Max-Age=0";
+      setTimeout(function() {{ document.body.removeChild(iframe); }}, 2000);
+    }} else if (attempts >= maxAttempts) {{
+      clearInterval(timer);
       overlay.style.display = "none";
-      alert("PDF generation failed: " + e.message);
-    }});
+      document.body.removeChild(iframe);
+      alert("PDF generation timed out. Please try again.");
+    }}
+  }}, 500);
 }}
 function toggleHoldings() {{
   var c = document.getElementById("holdings-container");

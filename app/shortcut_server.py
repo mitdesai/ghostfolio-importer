@@ -66,6 +66,7 @@ class _ResponseMixin:
             "Content-Disposition",
             f'attachment; filename="{filename}"',
         )
+        self.send_header("Set-Cookie", "pdf_ready=1; Path=/; Max-Age=30")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(pdf_bytes)
