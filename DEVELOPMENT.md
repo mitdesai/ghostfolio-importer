@@ -27,6 +27,8 @@ tests/
 ├── fixtures.py          # Real CSV snippets from Fidelity and Robinhood
 ├── test_date_serialization.py  # TZ-safe date serialization tests
 └── test_pipeline.py     # 27 integration tests (config, parsers, watcher, shortcut)
+tools/
+└── preview_snapshot.py  # Render snapshot dashboard with mock data (no Ghostfolio needed)
 ```
 
 ---
@@ -371,6 +373,30 @@ python -m pytest tests/ -v
 - **Snapshot feature**: `fetch_snapshot()`, `render_html()`, and the `/snapshot` endpoints have no automated tests. Testing would require either a live Ghostfolio instance or detailed mocking of the multi-call API pattern.
 - **WeasyPrint PDF rendering**: Not exercised in tests.
 - **End-to-end with real Ghostfolio**: Tests stub the `GhostfolioClient` — no actual HTTP calls to Ghostfolio.
+
+---
+
+## Dev tools
+
+### `tools/preview_snapshot.py`
+
+Renders the snapshot dashboard HTML using mock data — no running Ghostfolio instance or Docker container needed. Useful for iterating on the template design locally.
+
+```bash
+# Full dashboard with account details (default) — opens in browser
+python tools/preview_snapshot.py
+
+# Summary mode — no per-account breakdowns (matches "PDF Summary" output)
+python tools/preview_snapshot.py --no-details
+
+# Generate both versions side by side
+python tools/preview_snapshot.py --both
+
+# Write to a specific file instead of a temp file
+python tools/preview_snapshot.py --out /tmp/snapshot.html
+```
+
+The mock data includes 9 holdings across 3 account types (Roth IRA, Traditional IRA, Regular Brokerage) with multiple brokerage accounts per holding. Edit `_build_mock_data()` to adjust symbols, quantities, or account structure.
 
 ---
 

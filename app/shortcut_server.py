@@ -29,6 +29,7 @@ import threading
 from datetime import date as date_cls, datetime
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 
 from .activity import Activity
 from .dedup import DedupStore
@@ -97,31 +98,20 @@ class ShortcutServer:
                 self.end_headers()
                 self.wfile.write(pdf_bytes)
 
-            def _handle_snapshot_html(self):
-                snap = fetch_snapshot(
-                    server_ref.client,
-                    currency=server_ref.currency,
-                )
-                self._send_html(200, render_html(snap))
-
-            def _handle_snapshot_pdf(self):
-                snap = fetch_snapshot(
-                    server_ref.client,
-                    currency=server_ref.currency,
-                )
-                from weasyprint import HTML as WeasyHTML
-                pdf_bytes = WeasyHTML(string=render_html(snap)).write_pdf()
-                filename = f"portfolio-snapshot-{snap.report_date.isoformat()}.pdf"
-                self._send_pdf(pdf_bytes, filename)
-
             def do_GET(self):
-                # Public routes (no auth required)
+                parsed = urlparse(self.path)
+                qs = parse_qs(parsed.query)
+                path = parsed.path
                 public = {
                     "/health": lambda: self._send_json(200, {"ok": True}),
-                    "/snapshot": self._handle_snapshot_html,
-                    "/snapshot/pdf": self._handle_snapshot_pdf,
+                    "/snapshot": lambda: self._send_html(
+                        200, server_ref._render_snapshot(show_details=True),
+                    ),
+                    "/snapshot/pdf": lambda: server_ref._send_snapshot_pdf(
+                        self, show_details="1" in qs.get("details", []),
+                    ),
                 }
-                handler = public.get(self.path)
+                handler = public.get(path)
                 if handler:
                     try:
                         handler()
@@ -161,6 +151,19 @@ class ShortcutServer:
                 self._handle_trade()
 
         return Handler
+
+    def _render_snapshot(self, show_details: bool = True) -> str:
+        snap = fetch_snapshot(self.client, currency=self.currency)
+        return render_html(snap, show_account_details=show_details)
+
+    def _send_snapshot_pdf(self, handler, show_details: bool = False) -> None:
+        snap = fetch_snapshot(self.client, currency=self.currency)
+        from weasyprint import HTML as WeasyHTML
+        html = render_html(snap, show_account_details=show_details)
+        pdf_bytes = WeasyHTML(string=html).write_pdf()
+        suffix = "-detailed" if show_details else ""
+        filename = f"portfolio-snapshot{suffix}-{snap.report_date.isoformat()}.pdf"
+        handler._send_pdf(pdf_bytes, filename)
 
     @staticmethod
     def _require(data: dict, key: str) -> str:
