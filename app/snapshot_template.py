@@ -545,6 +545,27 @@ body {{
   margin: 32px 0 16px;
   color: var(--text);
 }}
+.section-bar {{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}}
+.section-bar .section-heading {{ margin-bottom: 0; }}
+.section-controls {{ display: flex; gap: 8px; }}
+.ctrl-btn {{
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}}
+.ctrl-btn:hover {{ border-color: var(--muted); color: var(--text); }}
 
 /* ── Holding Cards ── */
 .holding-card {{
@@ -724,6 +745,41 @@ body {{
 .gain-pos {{ color: var(--green); }}
 .gain-neg {{ color: var(--red); }}
 
+/* ── Loading overlay ── */
+.loading-overlay {{
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}}
+.loading-box {{
+  background: var(--card);
+  padding: 32px 48px;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  text-align: center;
+}}
+.spinner {{
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 16px;
+  border: 3px solid var(--border);
+  border-top-color: var(--header-bg);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}}
+@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+.loading-text {{
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
+}}
+
 /* ── Footer ── */
 .footer {{
   text-align: center;
@@ -753,7 +809,7 @@ body {{
     print-color-adjust: exact;
   }}
   .container {{ padding: 0; max-width: none; }}
-  .btn-pdf, .btn-group {{ display: none !important; }}
+  .btn-pdf, .btn-group, .section-controls {{ display: none !important; }}
   .header {{ border-radius: 0; margin-bottom: 16px; padding: 16px 24px; }}
 
   /* Force all <details> sections open for print */
@@ -808,8 +864,15 @@ body {{
       <div class="date">{date_str}</div>
     </div>
     <div class="btn-group">
-      <a href="/snapshot/pdf" class="btn-pdf">PDF Summary</a>
-      <a href="/snapshot/pdf?details=1" class="btn-pdf btn-pdf-alt">PDF with Account Details</a>
+      <button class="btn-pdf" onclick="downloadPdf('/snapshot/pdf')">PDF Summary</button>
+      <button class="btn-pdf btn-pdf-alt" onclick="downloadPdf('/snapshot/pdf?details=1')">PDF with Account Details</button>
+    </div>
+  </div>
+
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <div class="loading-text">Generating PDF&hellip;</div>
     </div>
   </div>
 
@@ -820,8 +883,16 @@ body {{
     {type_chart}
   </div>
 
-  <h2 class="section-heading">Holdings</h2>
-  {holding_cards}
+  <div class="section-bar">
+    <h2 class="section-heading">Holdings</h2>
+    <div class="section-controls">
+      <button id="holdings-toggle" class="ctrl-btn" onclick="toggleHoldings()">Collapse</button>
+      <button id="accounts-toggle" class="ctrl-btn" onclick="toggleAllAccounts()">Expand All Accounts</button>
+    </div>
+  </div>
+  <div id="holdings-container">
+    {holding_cards}
+  </div>
 
   {'<h2 class="section-heading">By Account Type</h2>' if type_sections else ""}
   {type_sections}
@@ -831,5 +902,46 @@ body {{
   </div>
 
 </div>
+<script>
+function downloadPdf(url) {{
+  var overlay = document.getElementById("loading-overlay");
+  overlay.style.display = "flex";
+  fetch(url)
+    .then(function(r) {{
+      if (!r.ok) throw new Error("Server returned " + r.status);
+      var cd = r.headers.get("Content-Disposition") || "";
+      var m = cd.match(/filename="?([^"]+)"?/);
+      return r.blob().then(function(b) {{ return {{blob: b, name: m ? m[1] : "portfolio-snapshot.pdf"}}; }});
+    }})
+    .then(function(o) {{
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(o.blob);
+      a.download = o.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      overlay.style.display = "none";
+    }})
+    .catch(function(e) {{
+      overlay.style.display = "none";
+      alert("PDF generation failed: " + e.message);
+    }});
+}}
+function toggleHoldings() {{
+  var c = document.getElementById("holdings-container");
+  var b = document.getElementById("holdings-toggle");
+  var hidden = c.style.display === "none";
+  c.style.display = hidden ? "" : "none";
+  b.textContent = hidden ? "Collapse" : "Expand";
+}}
+function toggleAllAccounts() {{
+  var all = document.querySelectorAll(".acct-details");
+  var b = document.getElementById("accounts-toggle");
+  var anyOpen = Array.prototype.some.call(all, function(d) {{ return d.open; }});
+  all.forEach(function(d) {{ d.open = !anyOpen; }});
+  b.textContent = anyOpen ? "Expand All Accounts" : "Collapse All Accounts";
+}}
+</script>
 </body>
 </html>"""

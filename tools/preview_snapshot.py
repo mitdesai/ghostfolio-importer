@@ -90,7 +90,7 @@ def _build_mock_data() -> PortfolioSnapshot:
         _ah("TSLA", "Tesla, Inc.", "a2", "Brokerage - MH (Fidelity)",
             ACCOUNT_TYPE_BROKERAGE, 81.0, 3700.08, 392.50),
         _ah("TSLA", "Tesla, Inc.", "a6", "Brokerage Link",
-            ACCOUNT_TYPE_BROKERAGE, 56.0, 19600.00, 392.50),
+            ACCOUNT_TYPE_TRADITIONAL, 56.0, 19600.00, 392.50),
         _ah("TSLA", "Tesla, Inc.", "a3", "Brokerage - Joint Investment",
             ACCOUNT_TYPE_BROKERAGE, 5.0, 1665.05, 392.50),
         _ah("TSLA", "Tesla, Inc.", "a5", "Traditional IRA - MH",
@@ -108,7 +108,7 @@ def _build_mock_data() -> PortfolioSnapshot:
         _ah("META", "Meta Platforms, Inc.", "a1", "Brokerage - MH (Robinhood)",
             ACCOUNT_TYPE_BROKERAGE, 0.3426, 193.51, 670.01),
         _ah("META", "Meta Platforms, Inc.", "a6", "Brokerage Link",
-            ACCOUNT_TYPE_BROKERAGE, 56.0, 31584.00, 670.01),
+            ACCOUNT_TYPE_TRADITIONAL, 56.0, 31584.00, 670.01),
         _ah("META", "Meta Platforms, Inc.", "a5", "Traditional IRA - MH",
             ACCOUNT_TYPE_TRADITIONAL, 23.0, 13489.90, 670.01),
         # HIMS

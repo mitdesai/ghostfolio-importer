@@ -95,8 +95,10 @@ class ShortcutServer:
                     "Content-Disposition",
                     f'attachment; filename="{filename}"',
                 )
+                self.send_header("Connection", "close")
                 self.end_headers()
                 self.wfile.write(pdf_bytes)
+                self.wfile.flush()
 
             def do_GET(self):
                 parsed = urlparse(self.path)

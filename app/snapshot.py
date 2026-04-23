@@ -18,7 +18,7 @@ def classify_account(name: str) -> str:
     lower = name.lower()
     if "roth" in lower:
         return ACCOUNT_TYPE_ROTH
-    if "ira" in lower:
+    if "ira" in lower or "brokerage link" in lower:
         return ACCOUNT_TYPE_TRADITIONAL
     return ACCOUNT_TYPE_BROKERAGE
 
