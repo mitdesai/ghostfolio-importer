@@ -915,13 +915,17 @@ function downloadPdf(url) {{
     }})
     .then(function(o) {{
       var a = document.createElement("a");
-      a.href = URL.createObjectURL(o.blob);
+      var blobUrl = URL.createObjectURL(o.blob);
+      a.href = blobUrl;
       a.download = o.name;
+      a.style.display = "none";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
       overlay.style.display = "none";
+      setTimeout(function() {{
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }}, 3000);
     }})
     .catch(function(e) {{
       overlay.style.display = "none";

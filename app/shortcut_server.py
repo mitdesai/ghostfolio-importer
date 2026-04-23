@@ -39,6 +39,40 @@ from .snapshot_template import render_html
 log = logging.getLogger(__name__)
 
 
+class _ResponseMixin:
+    """Shared response helpers for BaseHTTPRequestHandler subclasses."""
+
+    def _send_json(self, status, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_html(self, status, html):
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_pdf(self, pdf_bytes, filename):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/pdf")
+        self.send_header("Content-Length", str(len(pdf_bytes)))
+        self.send_header(
+            "Content-Disposition",
+            f'attachment; filename="{filename}"',
+        )
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(pdf_bytes)
+        self.wfile.flush()
+        self.close_connection = True
+
+
 class ShortcutServer:
     def __init__(
         self,
@@ -61,44 +95,15 @@ class ShortcutServer:
     def _make_handler(self):
         server_ref = self
 
-        class Handler(BaseHTTPRequestHandler):
+        class Handler(_ResponseMixin, BaseHTTPRequestHandler):
             def log_message(self, format, *args):
                 log.info("http %s - %s", self.address_string(), format % args)
-
-            def _send_json(self, status, payload):
-                body = json.dumps(payload).encode()
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
 
             def _check_auth(self) -> bool:
                 if self.headers.get("X-Auth-Token") != server_ref.auth_token:
                     self._send_json(401, {"error": "unauthorized"})
                     return False
                 return True
-
-            def _send_html(self, status, html):
-                body = html.encode("utf-8")
-                self.send_response(status)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def _send_pdf(self, pdf_bytes, filename):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/pdf")
-                self.send_header("Content-Length", str(len(pdf_bytes)))
-                self.send_header(
-                    "Content-Disposition",
-                    f'attachment; filename="{filename}"',
-                )
-                self.send_header("Connection", "close")
-                self.end_headers()
-                self.wfile.write(pdf_bytes)
-                self.wfile.flush()
 
             def do_GET(self):
                 parsed = urlparse(self.path)
