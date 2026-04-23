@@ -16,12 +16,10 @@ Endpoints:
   Response: 200 {"imported": bool, "fingerprint": str}
 
   GET /snapshot
-  Headers: X-Auth-Token: <HTTP_TOKEN>
-  Response: HTML portfolio snapshot
+  Response: HTML portfolio snapshot (no auth — read-only)
 
   GET /snapshot/pdf
-  Headers: X-Auth-Token: <HTTP_TOKEN>
-  Response: PDF download of portfolio snapshot
+  Response: PDF download of portfolio snapshot (no auth — read-only)
 """
 from __future__ import annotations
 
@@ -117,38 +115,34 @@ class ShortcutServer:
                 self._send_pdf(pdf_bytes, filename)
 
             def do_GET(self):
-                routes = {
+                # Public routes (no auth required)
+                public = {
+                    "/health": lambda: self._send_json(200, {"ok": True}),
                     "/snapshot": self._handle_snapshot_html,
                     "/snapshot/pdf": self._handle_snapshot_pdf,
                 }
-                if self.path == "/health":
-                    self._send_json(200, {"ok": True})
+                handler = public.get(self.path)
+                if handler:
+                    try:
+                        handler()
+                    except Exception as e:
+                        log.error("%s failed: %s", self.path, e, exc_info=True)
+                        self._send_json(500, {"error": str(e)})
                     return
-                handler = routes.get(self.path)
-                if not handler:
-                    self._send_json(404, {"error": "not found"})
-                    return
-                if not self._check_auth():
-                    return
-                try:
-                    handler()
-                except Exception as e:
-                    log.error("%s failed: %s", self.path, e, exc_info=True)
-                    self._send_json(500, {"error": str(e)})
+                self._send_json(404, {"error": "not found"})
 
-            def do_POST(self):
-                if self.path != "/trade":
-                    self._send_json(404, {"error": "not found"})
-                    return
-                if self.headers.get("X-Auth-Token") != server_ref.auth_token:
-                    self._send_json(401, {"error": "unauthorized"})
-                    return
+            def _read_json_body(self) -> dict | None:
                 length = int(self.headers.get("Content-Length", "0") or "0")
                 raw = self.rfile.read(length) if length else b""
                 try:
-                    data = json.loads(raw or b"{}")
+                    return json.loads(raw or b"{}")
                 except json.JSONDecodeError:
                     self._send_json(400, {"error": "invalid json"})
+                    return None
+
+            def _handle_trade(self):
+                data = self._read_json_body()
+                if data is None:
                     return
                 try:
                     activity = server_ref._build_activity(data)
@@ -158,29 +152,47 @@ class ShortcutServer:
                 imported, fp = server_ref._import(activity)
                 self._send_json(200, {"imported": imported, "fingerprint": fp})
 
+            def do_POST(self):
+                if self.path != "/trade":
+                    self._send_json(404, {"error": "not found"})
+                    return
+                if not self._check_auth():
+                    return
+                self._handle_trade()
+
         return Handler
 
-    def _build_activity(self, data: dict) -> Activity:
-        def need(k):
-            v = data.get(k)
-            if v is None or v == "":
-                raise ValueError(f"missing field: {k}")
-            return v
+    @staticmethod
+    def _require(data: dict, key: str) -> str:
+        v = data.get(key)
+        if v is None or v == "":
+            raise ValueError(f"missing field: {key}")
+        return str(v).strip()
 
-        account_key = str(need("account")).strip()
+    @staticmethod
+    def _parse_trade_date(raw: str | None) -> date_cls:
+        if not raw:
+            return date_cls.today()
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("date must be YYYY-MM-DD")
+
+    def _build_activity(self, data: dict) -> Activity:
+        account_key = self._require(data, "account")
         if account_key not in self.account_map:
             raise ValueError(
                 f"unknown account '{account_key}'. "
                 f"Expected one of: {sorted(self.account_map)}"
             )
 
-        action = str(need("action")).upper().strip()
+        action = self._require(data, "action").upper()
         if action not in ("BUY", "SELL"):
             raise ValueError("action must be BUY or SELL")
 
         try:
-            quantity = Decimal(str(need("quantity")))
-            unit_price = Decimal(str(need("unit_price")))
+            quantity = Decimal(self._require(data, "quantity"))
+            unit_price = Decimal(self._require(data, "unit_price"))
             fee = Decimal(str(data.get("fee", "0")))
         except InvalidOperation as e:
             raise ValueError(f"invalid number: {e}")
@@ -188,21 +200,12 @@ class ShortcutServer:
         if quantity <= 0 or unit_price <= 0:
             raise ValueError("quantity and unit_price must be > 0")
 
-        raw_date = data.get("date")
-        if raw_date:
-            try:
-                trade_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise ValueError("date must be YYYY-MM-DD")
-        else:
-            trade_date = date_cls.today()
-
         return Activity(
             account_id=self.account_map[account_key],
-            symbol=str(need("symbol")).upper().strip(),
+            symbol=self._require(data, "symbol").upper(),
             data_source="YAHOO",
             currency=self.currency,
-            date=trade_date,
+            date=self._parse_trade_date(data.get("date")),
             action=action,
             quantity=quantity,
             unit_price=unit_price,

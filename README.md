@@ -176,14 +176,14 @@ Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
 
 ## HTTP Endpoints
 
-All authenticated endpoints require the `X-Auth-Token: <HTTP_TOKEN>` header. The `/health` endpoint is intentionally unauthenticated (used by Docker HEALTHCHECK).
+The `/trade` endpoint requires the `X-Auth-Token: <HTTP_TOKEN>` header (it writes data). Read-only endpoints are unauthenticated — the service runs on your local network.
 
 | Endpoint | Method | Auth | Description |
 |---|---|---|---|
 | `/health` | GET | No | Liveness check. Returns `{"ok": true}`. |
 | `/trade` | POST | Yes | Log a trade (iOS Shortcut or any HTTP client). |
-| `/snapshot` | GET | Yes | Portfolio snapshot as HTML page. |
-| `/snapshot/pdf` | GET | Yes | Portfolio snapshot as PDF download. |
+| `/snapshot` | GET | No | Portfolio snapshot as HTML page. |
+| `/snapshot/pdf` | GET | No | Portfolio snapshot as PDF download. |
 
 ### POST /trade
 
@@ -246,9 +246,9 @@ Returns an HTML page showing the current portfolio state. Data is fetched live f
 
 **Performance note**: Response time scales with the number of Ghostfolio accounts. The snapshot makes N+2 API calls (1 for account list, 1 for overall holdings, N for per-account holdings). With 7 accounts, expect 2–5 seconds on a local network.
 
-**Example**:
+**Example**: open `http://192.168.1.2:8421/snapshot` in a browser, or:
 ```bash
-curl -s -H "X-Auth-Token: $TOKEN" http://192.168.1.2:8421/snapshot > snapshot.html
+curl -s http://192.168.1.2:8421/snapshot > snapshot.html
 ```
 
 ### GET /snapshot/pdf
@@ -259,7 +259,7 @@ PDF rendering adds ~1–3 seconds on top of the HTML generation time (WeasyPrint
 
 **Example**:
 ```bash
-curl -s -H "X-Auth-Token: $TOKEN" http://192.168.1.2:8421/snapshot/pdf -o portfolio.pdf
+curl -s http://192.168.1.2:8421/snapshot/pdf -o portfolio.pdf
 ```
 
 ---
@@ -392,11 +392,12 @@ docker compose exec importer python -m app.list_accounts
 ### Check portfolio snapshot
 
 ```bash
-# HTML (opens in browser or pipe to file)
-curl -s -H "X-Auth-Token: $TOKEN" http://<host>:8421/snapshot > snapshot.html
+# Open in browser
+open http://<host>:8421/snapshot
 
-# PDF download
-curl -s -H "X-Auth-Token: $TOKEN" http://<host>:8421/snapshot/pdf -o snapshot.pdf
+# Or save to file
+curl -s http://<host>:8421/snapshot > snapshot.html
+curl -s http://<host>:8421/snapshot/pdf -o snapshot.pdf
 ```
 
 ### Health check

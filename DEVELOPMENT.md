@@ -37,7 +37,7 @@ tests/
 
 | Thread | Name | What it runs |
 |---|---|---|
-| HTTP server | `http` | `ShortcutServer.run_forever()` → `ThreadingHTTPServer` serving `/health`, `/trade`, `/snapshot`, `/snapshot/pdf` |
+| HTTP server | `http` | `ShortcutServer.run_forever()` → `ThreadingHTTPServer` serving `/health`, `/trade` (auth required), `/snapshot`, `/snapshot/pdf` (no auth) |
 | Fidelity watcher | `fidelity` | `CsvDropWatcher.run_forever()` with `parse_fidelity_csv` — polls every 60s |
 | Robinhood watcher | `robinhood` | `CsvDropWatcher.run_forever()` with `parse_robinhood_csv` — polls every 60s |
 
